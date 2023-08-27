@@ -106,4 +106,4 @@ if __name__ == "__main__":
     open_connection()
     close_connection()
     sniff_packets()
-    # sniff_udp_packets()
+    sniff_udp_packets()
