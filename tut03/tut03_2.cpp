@@ -1,44 +1,50 @@
 #include <iostream>
 #include <tins/tins.h>
+#include <pthread.h>
+#include <unistd.h>
 
 using namespace Tins;
 using namespace std;
 
 // const string target_ip = "104.124.137.161"; // https://www.hepsiburada.com/
-const string target_ip = "10.11.22.12";
+const string target_ip = "104.124.137.161";
 
-void tcp_3_way_handshake(){
+void* scan(void*){
+    // Specify the network interface to capture packets from (e.g., "eth0")
     Sniffer sniffer("eth0");
     bool syn_received = false;
     bool syn_ack_received = false;
     bool ack_received = false;
+
     vector<EthernetII> v;
 
-    sniffer.sniff_loop([&syn_received, &syn_ack_received, &ack_received, &v ](Packet & packet){
+    // Specify the network interface to send the packet from(e.g., "eth0")
+    NetworkInterface iface("eth0");
+    // Start capturing packets
+    sniffer.sniff_loop([&syn_received, &syn_ack_received, &ack_received, &v](Packet &packet){
         const IP &ip = packet.pdu()->rfind_pdu<IP>();
         const TCP &tcp = packet.pdu()->rfind_pdu<TCP>();
         const RawPDU &raw = packet.pdu()->rfind_pdu<RawPDU>();
-        if(ip.dst_addr()==target_ip || ip.src_addr()==target_ip){
-            cout<<ip.src_addr()<<" "<<ip.dst_addr()<<endl;
-            if(tcp.get_flag(TCP::SYN)) cout<<"SYN ";
-            if(tcp.get_flag(TCP::ACK)) cout<<"ACK ";
-            // if(v.size()>=3) return false;
-            // if (!syn_received && tcp.get_flag(TCP::SYN)){
-            //     syn_received = true;
-            //     cout << "SYN received" << endl;
-            //     v.push_back(EthernetII() / ip / tcp / raw);
-            // }
-            // else if (!syn_ack_received && tcp.get_flag(TCP::SYN) && tcp.get_flag(TCP::ACK)){
-            //     syn_ack_received = true;
-            //     cout << "SYN-ACK received" << endl;
-            //     v.push_back(EthernetII() / ip / tcp / raw);
-            // }
-            // else if (!ack_received && tcp.get_flag(TCP::ACK)){
-            //     ack_received = true;
-            //     cout << "ACK received" << endl;
-            //     v.push_back(EthernetII() / ip / tcp / raw);
-            // }
-            cout<<endl;
+
+        cout<<"source: "<< ip.src_addr()<<" destination: "<<ip.dst_addr()<<endl;
+
+        if(ip.dst_addr() == target_ip && v.size()<3){
+            if (!syn_received && tcp.get_flag(TCP::SYN)){
+                syn_received = true;
+                cout<<"SYN received"<<endl;
+                v.push_back(EthernetII() / ip / tcp / raw);
+            }
+            else if (syn_received && syn_ack_received && tcp.get_flag(TCP::ACK)){
+                ack_received = true;
+                cout<<"ACK received"<<endl;
+                v.push_back(EthernetII() / ip / tcp / raw);
+            }
+        }else if(ip.src_addr() == target_ip && v.size()<3){
+            if (syn_received && !syn_ack_received && tcp.get_flag(TCP::SYN) && tcp.get_flag(TCP::ACK)){
+                syn_ack_received = true;
+                cout<<"SYN-ACK received"<<endl;
+                v.push_back(EthernetII() / ip / tcp / raw);
+            }
         }
         return !syn_received || !syn_ack_received || !ack_received;
     });
@@ -47,21 +53,48 @@ void tcp_3_way_handshake(){
     {
         PacketWriter writer("./output/TCP_3_way_handshake_start_2101AI40.pcap", DataLinkType<EthernetII>());
         writer.write(v.begin(), v.end());
-    }else{
-        cout<<"No response"<<endl;
     }
+    return 0;
 }
 
-void sniff_udp_packets()
-{
-    try
-    {
+void send_syn_packet(){
+    // Specify the network interface to send the packet from(e.g., "eth0")
+    NetworkInterface iface("eth0");
+
+    /* Retrieve this structure which holds the interface's IP,
+     * broadcast, hardware address and the network mask.
+     */
+    NetworkInterface::Info info = iface.addresses();
+
+    // Create an Ethernet frame
+    EthernetII eth = EthernetII() / IP(target_ip, info.ip_addr) / TCP(443, 12345) / RawPDU("Hello World");
+
+    // Set the TCP flags to SYN
+    eth.rfind_pdu<TCP>().set_flag(TCP::SYN, 1);
+
+    // Send the SYN packet
+    PacketSender sender;
+    sender.send(eth, iface);
+
+    std::cout << "SYN packet sent to initiate the TCP 3-way handshake." << std::endl;
+}
+
+void tcp_3_way_handshake(){
+    pthread_t thread_id;
+    pthread_create(&thread_id, NULL, scan,  NULL);
+    sleep(1);
+    send_syn_packet();
+    void* dummy;
+    pthread_join(thread_id, &dummy);
+}
+
+void sniff_udp_packets(){
+    try{
         // Specify the network interface to capture packets from (e.g., "eth0")
         Sniffer sniffer("eth0");
         vector<EthernetII> v;
         // Start capturing packets
-        sniffer.sniff_loop([&](Packet &packet)
-                           {
+        sniffer.sniff_loop([&](Packet &packet){
             if(v.size()>=2) return false;
             const IP &ip = packet.pdu()->rfind_pdu<IP>();
             const UDP &udp = packet.pdu()->rfind_pdu<UDP>();
@@ -77,12 +110,12 @@ void sniff_udp_packets()
             // send the packet
             PacketSender sender;
             sender.send(new_pkt, "eth0");
-            return true; });
+            return true;
+        });
         PacketWriter writer("./output/UDP_Packets_2101AI40.pcap", DataLinkType<EthernetII>());
         writer.write(v.begin(), v.end());
     }
-    catch (std::exception &ex)
-    {
+    catch (std::exception &ex){
         std::cerr << "Error: " << ex.what() << std::endl;
     }
 }
@@ -95,8 +128,7 @@ void sniff_tcp_packets()
         Sniffer sniffer("eth0");
         vector<EthernetII> v;
         // Start capturing packets
-        sniffer.sniff_loop([&](Packet &packet)
-                           {
+        sniffer.sniff_loop([&](Packet &packet){
             if(v.size()>=2) return false;
             const IP &ip = packet.pdu()->rfind_pdu<IP>();
             const TCP &tcp = packet.pdu()->rfind_pdu<TCP>();
@@ -112,7 +144,8 @@ void sniff_tcp_packets()
             // send the packet
             PacketSender sender;
             sender.send(new_pkt, "eth0");
-            return true; });
+            return true;
+        });
         PacketWriter writer("./output/TCP_Packets_2101AI40.pcap", DataLinkType<EthernetII>());
         writer.write(v.begin(), v.end());
     }
@@ -122,8 +155,7 @@ void sniff_tcp_packets()
     }
 }
 
-int main()
-{
+int main(){
     // sniff_udp_packets();
     // sniff_tcp_packets();
     tcp_3_way_handshake();
