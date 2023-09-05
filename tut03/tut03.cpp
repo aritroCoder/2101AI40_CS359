@@ -22,22 +22,22 @@ void tcp_3_way_handshake(){
             cout<<ip.src_addr()<<" "<<ip.dst_addr()<<endl;
             if(tcp.get_flag(TCP::SYN)) cout<<"SYN ";
             if(tcp.get_flag(TCP::ACK)) cout<<"ACK ";
-            // if(v.size()>=3) return false;
-            // if (!syn_received && tcp.get_flag(TCP::SYN)){
-            //     syn_received = true;
-            //     cout << "SYN received" << endl;
-            //     v.push_back(EthernetII() / ip / tcp / raw);
-            // }
-            // else if (!syn_ack_received && tcp.get_flag(TCP::SYN) && tcp.get_flag(TCP::ACK)){
-            //     syn_ack_received = true;
-            //     cout << "SYN-ACK received" << endl;
-            //     v.push_back(EthernetII() / ip / tcp / raw);
-            // }
-            // else if (!ack_received && tcp.get_flag(TCP::ACK)){
-            //     ack_received = true;
-            //     cout << "ACK received" << endl;
-            //     v.push_back(EthernetII() / ip / tcp / raw);
-            // }
+            if(v.size()>=3) return false;
+            if (!syn_received && tcp.get_flag(TCP::SYN)){
+                syn_received = true;
+                cout << "SYN received" << endl;
+                v.push_back(EthernetII() / ip / tcp / raw);
+            }
+            else if (!syn_ack_received && tcp.get_flag(TCP::SYN) && tcp.get_flag(TCP::ACK)){
+                syn_ack_received = true;
+                cout << "SYN-ACK received" << endl;
+                v.push_back(EthernetII() / ip / tcp / raw);
+            }
+            else if (!ack_received && tcp.get_flag(TCP::ACK)){
+                ack_received = true;
+                cout << "ACK received" << endl;
+                v.push_back(EthernetII() / ip / tcp / raw);
+            }
             cout<<endl;
         }
         return !syn_received || !syn_ack_received || !ack_received;
@@ -49,6 +49,54 @@ void tcp_3_way_handshake(){
         writer.write(v.begin(), v.end());
     }else{
         cout<<"No response"<<endl;
+    }
+}
+
+void tcp_3_way_closing_handshake()
+{
+    Sniffer sniffer("eth0");
+    bool syn_received = false;
+    bool syn_ack_received = false;
+    bool ack_received = false;
+    vector<EthernetII> v;
+
+    sniffer.sniff_loop([&syn_received, &syn_ack_received, &ack_received, &v](Packet &packet)
+                       {
+        const IP &ip = packet.pdu()->rfind_pdu<IP>();
+        const TCP &tcp = packet.pdu()->rfind_pdu<TCP>();
+        const RawPDU &raw = packet.pdu()->rfind_pdu<RawPDU>();
+        if(ip.dst_addr()==target_ip || ip.src_addr()==target_ip){
+            cout<<ip.src_addr()<<" "<<ip.dst_addr()<<endl;
+            if(tcp.get_flag(TCP::FIN)) cout<<"SYN ";
+            if(tcp.get_flag(TCP::ACK)) cout<<"ACK ";
+            if(v.size()>=3) return false;
+            if (!syn_received && tcp.get_flag(TCP::FIN)){
+                syn_received = true;
+                cout << "SYN received" << endl;
+                v.push_back(EthernetII() / ip / tcp / raw);
+            }
+            else if (!syn_ack_received && tcp.get_flag(TCP::FIN) && tcp.get_flag(TCP::ACK)){
+                syn_ack_received = true;
+                cout << "SYN-ACK received" << endl;
+                v.push_back(EthernetII() / ip / tcp / raw);
+            }
+            else if (!ack_received && tcp.get_flag(TCP::ACK)){
+                ack_received = true;
+                cout << "ACK received" << endl;
+                v.push_back(EthernetII() / ip / tcp / raw);
+            }
+            cout<<endl;
+        }
+        return !syn_received || !syn_ack_received || !ack_received; });
+    // write to pcap file
+    if (v.size() == 3)
+    {
+        PacketWriter writer("./output/TCP_3_way_handshake_start_2101AI40.pcap", DataLinkType<EthernetII>());
+        writer.write(v.begin(), v.end());
+    }
+    else
+    {
+        cout << "No response" << endl;
     }
 }
 
