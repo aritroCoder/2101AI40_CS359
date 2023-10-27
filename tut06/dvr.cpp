@@ -14,7 +14,10 @@ pthread_mutex_t mtx;
 pthread_mutex_t display;
 const int INF = 1e4;
 
-// read data from filename given
+/**
+ * Reads data from a file and initializes the distance, has_updated, next_hop, routers, and adj_list vectors.
+ * @param file The name of the file to read data from.
+ */
 void read_data(string file){
     ifstream fin(file);
     if(!fin.is_open()){
@@ -54,7 +57,13 @@ void read_data(string file){
     }
 }
 
-// display distance vectors
+/**
+ * Displays the distance vectors of the routers in the network.
+ * The function prints a table with the distance vectors of each router in the network.
+ * The first row of the table contains the names of the routers.
+ * The first column of the table contains the name of the router and the remaining columns contain the distance vectors.
+ * If the distance between two routers is infinite, the function prints the infinity symbol.
+ */
 void show_distance_vectors(){
     cout << "Distance vectors:" << endl;
     cout << "  ";
@@ -76,7 +85,12 @@ void show_distance_vectors(){
     }
 }
 
-// display next hop
+/**
+ * Displays the next hop for each router in the network.
+ * The function prints a table where each row represents a router and each column represents the next hop for that router to reach another router in the network.
+ * The first row of the table displays the router IDs.
+ * The first column of the table displays the router ID for which the next hop is being displayed.
+ */
 void show_next_hop(){
     cout << "Next hop:" << endl;
     cout << "  ";
@@ -93,7 +107,10 @@ void show_next_hop(){
     }
 }
 
-// check if the distance graph is connected
+/**
+ * Checks if the graph represented by adjacency matrix is connected or not using Breadth First Search(BFS).
+ * @return true if the graph is connected, false otherwise.
+ */
 bool check_graph_connected(){
     int n = distances.size();
     vector<bool> visited(n, false);
@@ -115,7 +132,11 @@ bool check_graph_connected(){
     return count == n;
 }
 
-// display routing table of a single router along with next hop
+/**
+ * Displays the routing table of a given router.
+ * @param router The index of the router whose routing table is to be displayed.
+ * @return void
+ */
 void show_routing_table(int router){
     cout << "@" << routers[router] << endl;
     cout << "Destination\t\tCost\t\tNext Hop" << endl;
@@ -130,7 +151,11 @@ void show_routing_table(int router){
     cout << endl;
 }
 
-// driver code for a router
+/**
+ * @brief This function represents a router in the network. It updates its routing table based on the information it receives from its adjacent routers.
+ * 
+ * @param r A pointer to the index of the router in the network.
+ */
 void router(void* r){
     int router_index = *((int*)r);
     int iter = 0;
