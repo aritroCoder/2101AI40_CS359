@@ -9,10 +9,13 @@
 
 int countVowels(char* c){
     int count = 0;
-    for(int i=0; i<strlen(c); i++){
-        if(c[i]=='a' || c[i]=='e' || c[i]=='i' || c[i]=='o' || c[i]=='u'){
+    // printf("%s\n", c);
+    int i = 0;
+    while (c[i] != '\0')
+    {
+        if (c[i] == 'a' || c[i] == 'A' || c[i] == 'e' || c[i] == 'E' || c[i] == 'i' || c[i] == 'I' || c[i] == 'o' || c[i] == 'O' || c[i] == 'u' || c[i] == 'U')
             count++;
-        }
+        c++;
     }
     return count;
 }
@@ -111,9 +114,12 @@ int main(int argc, char const *argv[])
     }
     valread = read(sock02, buffer, 1024);
     printf("Recieved: %s\n", buffer);
-    char* vowelCount;
-    snprintf(vowelCount, sizeof(vowelCount), "%d", countVowels(buffer));
-    send(sock02, vowelCount, strlen(hello), 0);
+    char *vowelCount = malloc(sizeof(char) * 1024);
+    printf("number of chars: %ld\n", strlen(buffer));
+    int vc = countVowels(buffer);
+    snprintf(vowelCount, sizeof(vowelCount), "%d", vc);
+    printf("number of vowels is: %s\n", vowelCount);
+    send(sock02, vowelCount, sizeof(vowelCount), 0);
     close(sock02);
     memset(buffer, '\0', sizeof(buffer));
 
